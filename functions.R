@@ -79,7 +79,6 @@ ped_assocs <- function(bed,bim,fam, MAF_filter, mind_filter, geno_filter, hwe_fi
   
   tests <- single.snp.tests(affected, data = data_patients$fam, snp.data = data_patients$genotypes)
   
-  
   chi2 <- chi.squared(tests, df=1)
   png("plot_chi2.png")
   par(mfrow=c(1,1))
@@ -171,4 +170,3 @@ manhatan_plot <- function(dataf1){
   cat("You can find the tiff image file with the most significant SNPs at: ", getwd(), "\n")
   Sys.sleep(2)
 }
-getwd()
