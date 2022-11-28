@@ -1,4 +1,3 @@
-
 library(hexbin)
 library(snpStats)
 library(tidyverse)
@@ -122,7 +121,6 @@ manhatan_plot <- function(dataf1){
   ##### Prepare X axis #####
   dataf1$BPcum <- as.double(don$BPcum)
   axisdf <- don %>% group_by(CHR) %>% summarize(center=( max(BPcum) + min(BPcum) ) / 2 )
-  
   
   if(max(-log10(dataf1$P)) > 8) {
     max_y_lim <- max(-log10(gwasResults$P)) + 0.5 
