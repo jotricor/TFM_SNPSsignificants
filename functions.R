@@ -40,7 +40,6 @@ ped_assocs <- function(bed,bim,fam, MAF_filter, mind_filter, geno_filter, hwe_fi
   cat("Total number of patients after mind filter: ", nrow(data_patients$fam), "\n")
   Sys.sleep(2)
   
-  
   ##### Delete sex chromosomes for subsequent genotype filtering ######
   
   data_patients$genotypes <- data_patients$genotypes[, data_patients$map$chromosome %in% 1:22]
@@ -67,8 +66,8 @@ ped_assocs <- function(bed,bim,fam, MAF_filter, mind_filter, geno_filter, hwe_fi
   Sys.sleep(2)
   
   use_genotypes <- snpsum$MAF >= MAF_filter & 
-    snpsum$Call.rate> gen_call_snp &
-    (use_hwe <- snpsum$z.HWE>zvalueHWEmin & snpsum$z.HWE<zvalueHWEmax)
+                   snpsum$Call.rate> gen_call_snp &
+                   (use_hwe <- snpsum$z.HWE>zvalueHWEmin & snpsum$z.HWE<zvalueHWEmax)
   use_genotypes[is.na(use_genotypes)] <- FALSE
   data_patients$genotypes <- data_patients$genotypes[,use_genotypes]
   snpsum <- col.summary(data_patients$genotypes)
@@ -93,34 +92,32 @@ ped_assocs <- function(bed,bim,fam, MAF_filter, mind_filter, geno_filter, hwe_fi
   dataf1[is.na(dataf1)] <- 0 #reemplazar na por false.
   dataf1 <- dataf1[dataf1$CHR %in% 1:22,]
   
-  
   dataf1$BP <- as.double(dataf1$BP)
   cat("Dataframe done succesfully \n")
   return(dataf1)
 }
-
 
 manhatan_plot <- function(dataf1){
   snps_int <- dataf1$SNP[dataf1$P < 5E-05]
   don <- dataf1 %>% 
     
     #### Calculate chromosome len #####
-  group_by(CHR) %>% 
+    group_by(CHR) %>% 
     summarise(chr_len=max(BP)) %>% 
     
     ##### Calculate cumulative position of each chromosome #####
-  mutate(tot=cumsum(chr_len)-chr_len) %>% #Para que no se solapen los SNPs en una única columna
+    mutate(tot=cumsum(chr_len)-chr_len) %>% #Para que no se solapen los SNPs en una única columna
     select(-chr_len) %>%
     
     ##### Add this information to original data #####
-  left_join(dataf1, ., by=c("CHR"="CHR")) %>%
+    left_join(dataf1, ., by=c("CHR"="CHR")) %>%
     
     ##### Add a cumulative position of each SNP #####
-  arrange(CHR, BP) %>% 
+    arrange(CHR, BP) %>% 
     mutate( BPcum=BP+tot) %>% 
     
     ##### Add highlight and annotation information #####
-  mutate( is_highlight=ifelse(SNP %in% snps_int, "yes", "no"))  %>% 
+    mutate( is_highlight=ifelse(SNP %in% snps_int, "yes", "no"))  %>% 
     mutate( is_annotate=ifelse(-log10(P)>-log10(5E-05), "yes", "no"))
   ##### Prepare X axis #####
   dataf1$BPcum <- as.double(don$BPcum)
@@ -136,7 +133,7 @@ manhatan_plot <- function(dataf1){
   mp <- ggplot(don, aes(x=BPcum, y=-log10(P))) +
     
     ##### Show all points #####
-  geom_point( aes(color=as.factor(CHR)), alpha=0.8, size=1.3) +
+    geom_point( aes(color=as.factor(CHR)), alpha=0.8, size=1.3) +
     scale_color_manual(values = rep(c("grey", "skyblue"), 22 )) +
     
     ##### Custom X axis #####:
@@ -144,19 +141,19 @@ manhatan_plot <- function(dataf1){
     scale_y_continuous(expand = c(0, 0) ) +     # remove space between plot area and x axis
     
     ##### NEW- to set the y-axis limit #####
-  ylim(0,max_y_lim) +
+    ylim(0,max_y_lim) +
     # Add highlighted points
     geom_point(data=subset(don, is_highlight=="yes"), color="orange", size=2) +
     
     ##### NEW - ADD LINES #####
-  geom_hline(yintercept=-log10(5E-08), linetype="dashed", color = "red") +
+    geom_hline(yintercept=-log10(5E-08), linetype="dashed", color = "red") +
     geom_hline(yintercept=-log10(5E-05), linetype="dotted", color = "blue") +
     
     ##### Add label using ggrepel to avoid overlapping #####
-  geom_label_repel( data=subset(don, is_annotate=="yes"), aes(label=SNP), size=2) +
+    geom_label_repel( data=subset(don, is_annotate=="yes"), aes(label=SNP), size=2) +
     xlab("Chromosome") + 
     ##### Custom the theme #####
-  theme_bw() +
+    theme_bw() +
     theme( 
       legend.position="none",
       axis.text.x = element_text(angle = 90, size = 6),
@@ -166,7 +163,7 @@ manhatan_plot <- function(dataf1){
       panel.grid.minor.x = element_blank()
     )
   
-  tiff(paste0("manhattan", ".tiff"), compression="lzw", width=1500, height=850, res=250); plot(mp); dev.off()
-  cat("You can find the tiff image file with the most significant SNPs at: ", getwd(), "\n")
+  plot(mp)
+  cat("You can find the image file with the most significant SNPs at: ", getwd(), "\n")
   Sys.sleep(2)
 }
