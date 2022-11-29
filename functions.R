@@ -1,4 +1,3 @@
-library(hexbin)
 library(snpStats)
 library(tidyverse)
 library(ggrepel)
