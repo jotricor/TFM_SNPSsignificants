@@ -7,3 +7,11 @@ dataf1 <- ped_assocs(bed ="test_binary.bed", bim ="test_binary.bim", fam="test_b
 tiff(paste0("manhattan",".tiff"), compression="lzw", width=1500, height=850, res=250)
   manhatan_plot(dataf1)
 dev.off()
+
+#### Use the second function of functions file to obtain the dataframe with most significant SNPs of PLIINK ####
+dataf2 <- plink_data(bed ="plink.bed", bim ="plink.bim", fam="plink.fam")
+
+#### Use the second function of functions file to obtain the most significant SNPs of PLINK image in tiff format ####
+tiff(paste0("manhattan_PLINK",".tiff"), compression="lzw", width=1500, height=850, res=250)
+  manhatan_plot(dataf2)
+dev.off()
