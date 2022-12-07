@@ -1,7 +1,7 @@
 library(snpStats)
 library(tidyverse)
 library(ggrepel)
-
+library(xlsx)
 
 ped_assocs <- function(bed,bim,fam, MAF_filter, mind_filter, geno_filter, hwe_filter){
   
@@ -21,6 +21,10 @@ ped_assocs <- function(bed,bim,fam, MAF_filter, mind_filter, geno_filter, hwe_fi
   hist(snpsum$MAF)
   hist(snpsum$z.HWE)
   dev.off()
+  png("plot_Callrategeno.png")
+  par(mfrow= c(1,1))
+  hist(snpsum$Call.rate)
+  dev.off()
   sample.qc <- row.summary(data_patients$genotypes)
   png("plot_qc.png")
   par(mfrow=c(1,1))
@@ -37,6 +41,7 @@ ped_assocs <- function(bed,bim,fam, MAF_filter, mind_filter, geno_filter, hwe_fi
   data_patients$fam <- data_patients$fam[use_min, ]
   cat("Total number of patients after mind filter: ", nrow(data_patients$fam), "\n")
   Sys.sleep(2)
+  
   
   ##### Delete sex chromosomes for subsequent genotype filtering ######
   
@@ -57,7 +62,6 @@ ped_assocs <- function(bed,bim,fam, MAF_filter, mind_filter, geno_filter, hwe_fi
   use_maf <- snpsum$MAF >= MAF_filter
   cat("Total number of snps deleted with maf filter: ", sum(snpsum$Call.rate>gen_call_snp & !snpsum$MAF>=MAF_filter), "\n")
   Sys.sleep(2)
-  
   zvalueHWEmin <- qnorm(hwe_filter)
   zvalueHWEmax <- qnorm(1-hwe_filter)
   cat("Total number of snps deleted with hwe filter: ", sum(snpsum$Call.rate>gen_call_snp & snpsum$MAF>=MAF_filter & !(snpsum$z.HWE>zvalueHWEmin & snpsum$z.HWE<zvalueHWEmax)), "\n")
@@ -75,7 +79,7 @@ ped_assocs <- function(bed,bim,fam, MAF_filter, mind_filter, geno_filter, hwe_fi
   ##### Statistical tests #####
   
   tests <- single.snp.tests(affected, data = data_patients$fam, snp.data = data_patients$genotypes)
-  
+   
   chi2 <- chi.squared(tests, df=1)
   png("plot_chi2.png")
   par(mfrow=c(1,1))
@@ -86,17 +90,56 @@ ped_assocs <- function(bed,bim,fam, MAF_filter, mind_filter, geno_filter, hwe_fi
   chr<- data_patients$map[use_genotypes, "chromosome"]
   name_snp <-  data_patients$map[use_genotypes, "snp.name"]
   p1 <- p.value(tests, df = 1)
-  dataf1 <- data.frame(SNP=name_snp,CHR=chr,BP=position,P=p1) 
-  dataf1[is.na(dataf1)] <- 0 #reemplazar na por false.
+  dataf1 <- data.frame(SNP=name_snp,CHR=chr,BP=position,Pvalue=p1) 
+  dataf1[is.na(dataf1)] <- 0 
   dataf1 <- dataf1[dataf1$CHR %in% 1:22,]
+  
   
   dataf1$BP <- as.double(dataf1$BP)
   cat("Dataframe done succesfully \n")
+  dataf1 <- dataf1[with(dataf1, order(dataf1$Pvalue)), ]
+  dataf1_less <- dataf1[1:15,]
+  write.xlsx(dataf1_less, "Most_significants.xlsx")
+  cat("Dataframe export as xlsx file \n")
   return(dataf1)
 }
 
-manhatan_plot <- function(dataf1){
-  snps_int <- dataf1$SNP[dataf1$P < 5E-05]
+plink_data <- function(bed,bim,fam){
+  
+  ##### Read data in plink format #####
+  
+  data_patients <- read.plink(bed, bim, fam)
+  snpsum <- col.summary(data_patients$genotypes)
+  
+  tests <- single.snp.tests(affected, data = data_patients$fam, snp.data = data_patients$genotypes)
+  
+  chi2 <- chi.squared(tests, df=1)
+  png("plot_chi2_plink.png")
+  par(mfrow=c(1,1))
+  qq.chisq(chi2, df = 1)
+  dev.off()
+  
+  position <- data_patients$map["position"] 
+  chromosome <- data_patients$map["chromosome"]
+  snp.name <-  data_patients$map["snp.name"]
+  Pvalue <- p.value(tests, df = 1)
+  
+  dataf1 <- data.frame(snp.name, chromosome, position, Pvalue)
+  colnames(dataf1) <- c('SNP','CHR','BP','Pvalue')
+  dataf1[is.na(dataf1)] <- 0
+  dataf1 <- dataf1[dataf1$CHR %in% 1:22,]
+  dataf1$BP <- as.double(dataf1$BP)
+  cat("Dataframe from PLINK done succesfully \n")
+  
+  dataf1 <- dataf1[with(dataf1, order(dataf1$Pvalue)), ]
+  dataf1_less <- dataf1[1:15,]
+  write.xlsx(dataf1_less, "Most_significants_PLINK.xlsx")
+  cat("Dataframe PLINK export as xlsx file \n")
+  return(dataf1)
+}
+
+manhatan_plot <- function(data){
+  snps_int <- dataf1$SNP[dataf1$Pvalue < 5E-05]
   don <- dataf1 %>% 
     
     #### Calculate chromosome len #####
@@ -116,18 +159,19 @@ manhatan_plot <- function(dataf1){
     
     ##### Add highlight and annotation information #####
     mutate( is_highlight=ifelse(SNP %in% snps_int, "yes", "no"))  %>% 
-    mutate( is_annotate=ifelse(-log10(P)>-log10(5E-05), "yes", "no"))
+    mutate( is_annotate=ifelse(-log10(Pvalue)>-log10(5E-05), "yes", "no"))
   ##### Prepare X axis #####
   dataf1$BPcum <- as.double(don$BPcum)
   axisdf <- don %>% group_by(CHR) %>% summarize(center=( max(BPcum) + min(BPcum) ) / 2 )
   
-  if(max(-log10(dataf1$P)) > 8) {
-    max_y_lim <- max(-log10(gwasResults$P)) + 0.5 
+  
+  if(max(-log10(dataf1$Pvalue)) > 8) {
+    max_y_lim <- max(-log10(dataf1$Pvalue)) + 0.5 
   } else {
     max_y_lim <- 8.5
   }
   
-  mp <- ggplot(don, aes(x=BPcum, y=-log10(P))) +
+  mp <- ggplot(don, aes(x=BPcum, y=-log10(Pvalue))) +
     
     ##### Show all points #####
     geom_point( aes(color=as.factor(CHR)), alpha=0.8, size=1.3) +
@@ -161,6 +205,6 @@ manhatan_plot <- function(dataf1){
     )
   
   plot(mp)
-  cat("You can find the image file with the most significant SNPs at: ", getwd(), "\n")
+  cat("You can find the tiff image file with the most significant SNPs at: ", getwd(), "\n")
   Sys.sleep(2)
 }
